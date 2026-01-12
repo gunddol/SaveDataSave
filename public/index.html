@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Save Vault — Backup to B2</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- fflate (zip 생성) -->
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="relative">
+        <!-- 배경 글로우 -->
+        <div class="pointer-events-none absolute inset-0 overflow-hidden">
+            <div class="absolute -top-24 -left-24 w-96 h-96 bg-fuchsia-600/20 blur-3xl rounded-full"></div>
+            <div class="absolute -top-32 right-0 w-[30rem] h-[30rem] bg-cyan-500/20 blur-3xl rounded-full"></div>
+            <div class="absolute bottom-0 left-1/3 w-[40rem] h-[40rem] bg-indigo-500/10 blur-3xl rounded-full"></div>
+        </div>
+
+        <main class="relative max-w-6xl mx-auto px-4 py-10">
+            <header class="mb-8">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="text-sm text-slate-200">Cloudflare Pages + Backblaze B2</span>
+                </div>
+                <h1 class="mt-4 text-3xl md:text-4xl font-bold tracking-tight">
+                    Save Vault <span class="text-slate-400 font-medium">— 게임 세이브 zip 백업</span>
+                </h1>
+                <p class="mt-2 text-slate-300 max-w-2xl">
+                    폴더를 선택하면 브라우저에서 zip을 만들고, B2에 업로드합니다. 로그와 목록/다운로드까지 한 페이지에서 처리합니다.
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 왼쪽: 백업 생성 -->
+                <section
+                    class="bg-white/5 border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.10)] p-5 md:p-6">
+                    <h2 class="text-xl font-semibold">새 백업 만들기</h2>
+                    <p class="mt-1 text-sm text-slate-300">
+                        “어디서든” 사용을 위해 경로 입력 대신 <span class="text-white font-semibold">폴더 선택</span> 방식입니다.
+                    </p>
+
+                    <!-- 토큰(선택) -->
+                    <div class="mt-4">
+                        <label class="block text-sm text-slate-300">Access Token (선택/권장)</label>
+                        <input id="tokenInput"
+                            class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/50"
+                            placeholder="API 보호용 토큰 (APP_TOKEN 설정 시 필수)" />
+                        <p class="mt-1 text-xs text-slate-400">공개 배포라면 APP_TOKEN을 걸어두는 걸 강력 추천합니다.</p>
+                    </div>
+
+                    <!-- 레이블 -->
+                    <div class="mt-4">
+                        <label class="block text-sm text-slate-300">백업 이름(게임명 등)</label>
+                        <input id="labelInput"
+                            class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/50"
+                            placeholder="예: EldenRing / Stardew / MyGame" />
+                    </div>
+
+                    <!-- 폴더 선택 -->
+                    <div class="mt-4 flex gap-2">
+                        <button id="pickFolderBtn"
+                            class="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition">
+                            폴더 선택
+                        </button>
+
+                        <!-- fallback: webkitdirectory -->
+                        <input id="folderInput" type="file" webkitdirectory directory multiple class="hidden" />
+
+                        <button id="startBtn"
+                            class="flex-1 px-4 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                            백업 시작
+                        </button>
+                    </div>
+
+                    <div class="mt-3 text-sm text-slate-300">
+                        선택된 폴더: <span id="pickedText" class="text-slate-100 font-medium">없음</span>
+                    </div>
+
+                    <!-- 상태/프로그레스 -->
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between text-sm text-slate-300">
+                            <span>진행 상태</span>
+                            <span id="statusText" class="text-slate-100 font-medium">대기</span>
+                        </div>
+                        <div class="mt-2 h-3 rounded-full bg-white/10 overflow-hidden">
+                            <div id="progressBar"
+                                class="h-full w-0 bg-gradient-to-r from-cyan-400 to-fuchsia-500 transition-all"></div>
+                        </div>
+                    </div>
+
+                    <!-- 로그 -->
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold">로그</h3>
+                            <button id="clearLogBtn" class="text-sm text-slate-300 hover:text-white">비우기</button>
+                        </div>
+                        <div id="logBox"
+                            class="mt-2 h-64 overflow-auto rounded-xl bg-slate-900/60 border border-white/10 p-3 font-mono text-xs leading-relaxed">
+                            <div class="text-slate-400">폴더를 선택하고 백업을 시작하면 로그가 출력됩니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-xs text-slate-400">
+                        참고: zip 생성은 브라우저에서 진행됩니다. 세이브 파일은 보통 작아서 충분히 빠르게 동작합니다.
+                    </div>
+                </section>
+
+                <!-- 오른쪽: 목록 -->
+                <section
+                    class="bg-white/5 border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.10)] p-5 md:p-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-semibold">저장된 백업</h2>
+                        <button id="refreshBtn"
+                            class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm transition">
+                            새로고침
+                        </button>
+                    </div>
+
+                    <div class="mt-4 overflow-hidden rounded-xl border border-white/10">
+                        <table class="w-full text-sm">
+                            <thead class="bg-white/5 text-slate-300">
+                                <tr>
+                                    <th class="text-left px-4 py-3">파일명</th>
+                                    <th class="text-left px-4 py-3 w-44">업로드 시각</th>
+                                    <th class="text-right px-4 py-3 w-28">용량</th>
+                                    <th class="text-right px-4 py-3 w-28">다운로드</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backupTbody" class="divide-y divide-white/10 bg-slate-950/10">
+                                <tr>
+                                    <td class="px-4 py-4 text-slate-400" colspan="4">목록을 불러오는 중…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-4 text-xs text-slate-400">
+                        다운로드는 서버가 B2에서 프록시합니다(버킷 Private 유지 가능).
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+
+</html>
