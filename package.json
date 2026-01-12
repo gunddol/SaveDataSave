@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "scripts": {
         "dev": "wrangler pages dev public",
-        "deploy": "wrangler pages deploy public"
+        "deploy": "wrangler pages deploy public --project-name save-data-save"
     },
     "devDependencies": {
         "wrangler": "^3.80.0"

@@ -1,5 +1,5 @@
 name = "save-data-save"
 compatibility_date = "2026-01-01"
 
-# Pages Functions 사용 시 별도 build는 필요 없음
-# 배포 시: wrangler pages deploy public
+# 정적 파일이 있는 폴더
+pages_build_output_dir = "public"
