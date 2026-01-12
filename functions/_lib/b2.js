@@ -131,10 +131,14 @@ export async function downloadByName(env, fileName) {
     if (!bucketName) throw new Error("Missing B2_BUCKET_NAME");
 
     // Private bucket: Authorization 헤더로 다운로드
-    const url = `${downloadUrl}/file/${encodeURIComponent(bucketName)}/${fileName
+    const encodedFileName = fileName
         .split("/")
         .map((seg) => encodeURIComponent(seg))
-        .join("/")}`;
+        .join("/");
+
+    const url = `${downloadUrl}/file/${encodeURIComponent(bucketName)}/${encodedFileName}`;
+
+    console.log(`[B2] Downloading from: ${url}`); // Debug Log
 
     const res = await fetch(url, {
         headers: {
@@ -144,6 +148,7 @@ export async function downloadByName(env, fileName) {
 
     if (!res.ok) {
         const text = await res.text().catch(() => "");
+        console.error(`[B2] Download failed: ${res.status} ${text}`); // Debug Log
         throw new Error(`B2 download failed: ${res.status} ${text}`);
     }
 

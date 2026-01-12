@@ -19,6 +19,7 @@ export async function onRequestGet(context) {
             headers
         });
     } catch (e) {
+        console.error(`[API] Download error:`, e);
         return serverError("Download failed", { detail: e?.message || String(e) });
     }
 }

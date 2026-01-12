@@ -245,6 +245,44 @@ async function uploadToB2({ uploadUrl, uploadAuthToken }, zipBlob, fileName, sha
     appendLog(`업로드 완료: ${data.fileName || fileName}`);
 }
 
+// ---- 다운로드 핸들러 ----
+async function handleDownload(fileName) {
+    try {
+        const url = `/api/download/${encodeURIComponent(fileName)}`;
+        appendLog(`다운로드 요청: ${fileName}`);
+        setStatus("다운로드 중…");
+
+        // 1. Fetch
+        const res = await fetch(url, {
+            headers: apiHeaders() // 토큰 포함
+        });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            throw new Error(`다운로드 실패 (${res.status}): ${text}`);
+        }
+
+        // 2. Blob 변환
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        // 3. 가상 클릭으로 다운로드 트리거
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+
+        appendLog(`다운로드 완료: ${fmtBytes(blob.size)}`);
+        setStatus("완료", "ok");
+    } catch (e) {
+        appendLog(`에러: ${e?.message || String(e)}`);
+        setStatus("실패", "bad");
+    }
+}
+
 // ---- 목록 ----
 async function fetchBackups() {
     backupTbody.innerHTML = `
@@ -282,15 +320,22 @@ async function fetchBackups() {
       <td class="px-4 py-3 text-slate-300">${fmtDate(item.uploadedAt)}</td>
       <td class="px-4 py-3 text-right text-slate-300">${fmtBytes(item.sizeBytes)}</td>
       <td class="px-4 py-3 text-right">
-        <a class="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-100 transition"
-           href="/api/download/${encodeURIComponent(item.name)}"
-           onclick="return true;">
+        <button class="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-100 transition download-btn"
+           data-name="${item.name}">
           받기
-        </a>
+        </button>
       </td>
     `;
         backupTbody.appendChild(tr);
     }
+
+    // Add click handlers for download buttons
+    document.querySelectorAll(".download-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            const name = e.target.getAttribute("data-name");
+            await handleDownload(name);
+        });
+    });
 }
 
 // ---- 메인 액션 ----
