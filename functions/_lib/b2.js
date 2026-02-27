@@ -154,3 +154,46 @@ export async function downloadByName(env, fileName) {
 
     return res;
 }
+
+export async function deleteFile(env, fileName) {
+    const { apiUrl, authorizationToken } = await getAuth(env);
+    const bucketId = env.B2_BUCKET_ID;
+    if (!bucketId) throw new Error("Missing B2_BUCKET_ID");
+
+    // 파일 ID 조회 (삭제에는 fileId가 필요)
+    const listRes = await fetch(`${apiUrl}/b2api/v2/b2_list_file_versions`, {
+        method: "POST",
+        headers: {
+            Authorization: authorizationToken,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ bucketId, startFileName: fileName, maxFileCount: 1 })
+    });
+
+    if (!listRes.ok) {
+        const text = await listRes.text().catch(() => "");
+        throw new Error(`b2_list_file_versions failed: ${listRes.status} ${text}`);
+    }
+
+    const listData = await listRes.json();
+    const file = (listData.files || []).find((f) => f.fileName === fileName);
+    if (!file) throw new Error(`파일을 찾을 수 없습니다: ${fileName}`);
+
+    // 파일 삭제
+    const delRes = await fetch(`${apiUrl}/b2api/v2/b2_delete_file_version`, {
+        method: "POST",
+        headers: {
+            Authorization: authorizationToken,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ fileName: file.fileName, fileId: file.fileId })
+    });
+
+    if (!delRes.ok) {
+        const text = await delRes.text().catch(() => "");
+        throw new Error(`b2_delete_file_version failed: ${delRes.status} ${text}`);
+    }
+
+    return await delRes.json();
+}
+

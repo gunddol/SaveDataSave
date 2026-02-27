@@ -245,6 +245,32 @@ async function uploadToB2({ uploadUrl, uploadAuthToken }, zipBlob, fileName, sha
     appendLog(`업로드 완료: ${data.fileName || fileName}`);
 }
 
+// ---- 삭제 핸들러 ----
+async function handleDelete(fileName) {
+    if (!confirm(`정말 삭제하시겠습니까?\n\n${fileName}`)) return;
+    try {
+        appendLog(`삭제 요청: ${fileName}`);
+        setStatus("삭제 중…");
+
+        const res = await fetch(`/api/delete/${encodeURIComponent(fileName)}`, {
+            method: "DELETE",
+            headers: apiHeaders()
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(`삭제 실패 (${res.status}): ${data?.detail || data?.error || ""}`);
+        }
+
+        appendLog(`삭제 완료: ${fileName}`);
+        setStatus("삭제 완료", "ok");
+        await fetchBackups();
+    } catch (e) {
+        appendLog(`에러: ${e?.message || String(e)}`);
+        setStatus("실패", "bad");
+    }
+}
+
 // ---- 다운로드 핸들러 ----
 async function handleDownload(fileName) {
     try {
@@ -320,20 +346,33 @@ async function fetchBackups() {
       <td class="px-4 py-3 text-slate-300">${fmtDate(item.uploadedAt)}</td>
       <td class="px-4 py-3 text-right text-slate-300">${fmtBytes(item.sizeBytes)}</td>
       <td class="px-4 py-3 text-right">
-        <button class="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-100 transition download-btn"
-           data-name="${item.name}">
-          받기
-        </button>
+        <div class="inline-flex gap-2 justify-end">
+          <button class="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-100 transition download-btn"
+             data-name="${item.name}">
+            받기
+          </button>
+          <button class="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 transition delete-btn"
+             data-name="${item.name}">
+            삭제
+          </button>
+        </div>
       </td>
     `;
         backupTbody.appendChild(tr);
     }
 
-    // Add click handlers for download buttons
+    // Add click handlers for download/delete buttons
     document.querySelectorAll(".download-btn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
-            const name = e.target.getAttribute("data-name");
+            const name = e.currentTarget.getAttribute("data-name");
             await handleDownload(name);
+        });
+    });
+
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            const name = e.currentTarget.getAttribute("data-name");
+            await handleDelete(name);
         });
     });
 }
@@ -385,6 +424,11 @@ pickFolderBtn.addEventListener("click", pickFolder);
 startBtn.addEventListener("click", startBackup);
 clearLogBtn.addEventListener("click", clearLog);
 refreshBtn.addEventListener("click", fetchBackups);
+
+// Access Token 입력 후 Enter → 목록 새로고침
+tokenInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") fetchBackups();
+});
 
 // 첫 로드
 fetchBackups();
